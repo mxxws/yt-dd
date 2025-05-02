@@ -23,7 +23,16 @@ echo.
 
 :: 更新日志
 set "logFile=update_log.md"
-set "date=%date:~0,4%-%date:~5,2%-%date:~8,2% %time:~0,8%"
+
+:: 获取当前日期时间
+for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
+set "YYYY=%dt:~0,4%"
+set "MM=%dt:~4,2%"
+set "DD=%dt:~6,2%"
+set "HH=%dt:~8,2%"
+set "Min=%dt:~10,2%"
+set "Sec=%dt:~12,2%"
+set "datestr=%YYYY%-%MM%-%DD% %HH%:%Min%:%Sec%"
 
 :: 检查日志文件是否存在
 if not exist "%logFile%" (
@@ -37,7 +46,7 @@ set /p commitMessage=请输入提交信息:
 
 :: 更新日志
 echo %YELLOW%更新日志...%RESET%
-echo ## %date% >> "%logFile%"
+echo ## %datestr% >> "%logFile%"
 echo. >> "%logFile%"
 echo - %commitMessage% >> "%logFile%"
 echo. >> "%logFile%"
@@ -100,7 +109,7 @@ git commit -m "%commitMessage%"
 
 :: 检查远程仓库是否已配置
 git remote | findstr "origin" > nul
-if errorlevel 1 (
+if %errorlevel% NEQ 0 (
     set /p gitUrl=请输入GitHub仓库URL (例如: https://github.com/username/yt-dd.git): 
     git remote add origin %gitUrl%
 )

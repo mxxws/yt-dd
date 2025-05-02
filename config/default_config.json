@@ -1,0 +1,14 @@
+{
+    "download_path": "Downloads",
+    "default_video_quality": "1080p",
+    "default_audio_quality": "best",
+    "default_subtitle_lang": "zh",
+    "theme": "fusion",
+    "auto_check_update": true,
+    "proxy": {
+        "enabled": false,
+        "type": "http",
+        "host": "",
+        "port": ""
+    }
+} 

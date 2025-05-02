@@ -1,0 +1,21 @@
+cd .\yt-dd\
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+
+.\venv\Scripts\Activate.ps1
+
+python main.py
+python build.py
+
+汇总命令
+cd .\yt-dd\; Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process; .\venv\Scripts\Activate.ps1; python main.py
+
+
+
+
+
+
+
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+.\build_exe.ps1
+

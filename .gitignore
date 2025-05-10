@@ -2,28 +2,13 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
 
-# Virtual Environment
+# 虚拟环境
 venv/
-env/
-ENV/
 
 # IDE
 .idea/
@@ -32,23 +17,25 @@ ENV/
 *.swo
 
 # PyInstaller
-build/
-dist/
 *.spec
 
-# Logs
+# 日志文件
 logs/
 *.log
+moviepy_import.log
 
-# Local
-.env
+# 系统文件
 .DS_Store
 Thumbs.db
 
-# PyCharm
-.idea/
+# 下载的文件
+*.mp4
+*.mp3
+*.m4a
+*.wav
+*.webm
+*.mkv
 
-# 特定项目文件
-__pycache__/
-*/__pycache__/
-*/*/__pycache__/ 
+# 本地开发文件
+命令.txt
+git_cmd推送.bat 

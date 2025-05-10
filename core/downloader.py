@@ -298,8 +298,12 @@ class VideoDownloader:
                     # 更新上一次的速度
                     self.last_speed = speed_str
                     
-                    # 发送进度更新信号
-                    self.signals.progress_updated.emit(real_percent, speed_str)
+                    # 控制更新频率，保证UI响应性的同时保持实时更新
+                    current_time = time.time()
+                    if current_time - self.last_update_time >= self.update_interval:
+                        self.last_update_time = current_time
+                        # 发送进度更新信号
+                        self.signals.progress_updated.emit(real_percent, speed_str)
                     
             elif d['status'] == 'finished':
                 # 打印换行以结束进度显示

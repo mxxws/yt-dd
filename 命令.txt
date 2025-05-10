@@ -17,5 +17,6 @@ cd .\yt-dd\; Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process; .
 
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
-.\build_exe.ps1
+
+1.02 解决moviepy依赖问题，更新所有依赖包，
 

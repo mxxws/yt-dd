@@ -140,6 +140,14 @@ class MainWindow(QMainWindow):
         self.analysis_label = QLabel("就绪")
         self.analysis_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.progress_bar = QProgressBar()
+        
+        # 进度条设置优化 - 使进度条更加平滑和实时
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setFormat("%p%")
+        
         self.speed_label = QLabel("速度: 0 MB/s")
         self.status_label = QLabel("就绪")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -313,7 +321,6 @@ class MainWindow(QMainWindow):
         # 确保进度更新信号正确连接
         self.downloader.signals.progress_updated.connect(self._update_progress)
         self.downloader.signals.info_loaded.connect(self._update_formats)
-        self.downloader.signals.download_finished.connect(self._on_download_complete)
         self.downloader.signals.error_occurred.connect(self._on_error)
 
     def _on_url_changed(self):
@@ -494,7 +501,9 @@ class MainWindow(QMainWindow):
             
             # 更新状态
             self.status_label.setText("下载完成")
-            self.log_text.append("下载完成")
+            
+            # 添加下载完成的日志记录
+            self.log_text.append(msg)
             
             # 解锁互斥锁
             self.mutex.unlock()

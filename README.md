@@ -124,7 +124,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 #### 方法1：直接使用可执行文件（Windows）
 
-1. 从[Releases](https://github.com/yourusername/yt-dd/releases)页面下载最新版本
+1. 从[Releases](https://github.com/mxxws/yt-dd/releases)页面下载最新版本
 2. 解压到任意位置
 3. 运行 `yt-dd.exe`
 

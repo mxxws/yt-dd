@@ -29,7 +29,7 @@ A YouTube video downloader based on PyQt6 and yt-dlp, supporting single video an
 
 #### Method 1: Direct Download (Windows)
 
-1. Download the latest release from [Releases](https://github.com/yourusername/yt-dd/releases)
+1. Download the latest release from [Releases](https://github.com/mxxws/yt-dd/releases)
 2. Extract to any location
 3. Run `yt-dd.exe`
 

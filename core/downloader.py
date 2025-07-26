@@ -10,8 +10,6 @@ import threading
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Callable, Any
 from dataclasses import dataclass
-from pytubefix import YouTube
-from pytubefix.cli import on_progress
 from moviepy.editor import VideoFileClip, AudioFileClip
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 import yt_dlp

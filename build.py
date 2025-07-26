@@ -254,75 +254,106 @@ def run_command(command, logger):
     return process.returncode
 
 def check_requirements(logger):
-    """检查必要的依赖"""
-    required_packages = ['PyQt6', 'yt-dlp', 'pytubefix', 'moviepy']
+    """检查必要的依赖，并验证版本一致性"""
+    required_packages = ['PyQt6', 'yt-dlp', 'moviepy']
     missing_packages = []
+    version_mismatch_packages = []
+    
+    # 读取 requirements.txt 中的版本信息
+    req_versions = {}
+    try:
+        with open('requirements.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if '==' in line:
+                    package_name, version = line.split('==', 1)
+                    req_versions[package_name] = version
+    except Exception as e:
+        print(f"读取 requirements.txt 失败: {str(e)}")
+        logger.log_warning(f"读取 requirements.txt 失败: {str(e)}", 'requirements_read_error')
     
     for package in required_packages:
         try:
-            __import__(package.replace('-', '_'))
+            module = __import__(package.replace('-', '_'))
             logger.log_dependency(package, 'installed')
-            logging.info(f"已安装: {package}")
+            
+            # 检查包版本是否与 requirements.txt 一致
+            current_version = None
+            if package == 'yt-dlp':
+                try:
+                    from yt_dlp.version import __version__ as current_version
+                except Exception:
+                    current_version = None
+            else:
+                try:
+                    current_version = getattr(module, '__version__', None)
+                except Exception:
+                    current_version = None
+            
+            # 获取 requirements.txt 中的版本
+            req_version = req_versions.get(package)
+            
+            if current_version and req_version:
+                logging.info(f"{package} 版本: {current_version}, requirements.txt: {req_version}")
+                print(f"{package} 版本: {current_version}, requirements.txt: {req_version}")
+                
+                if current_version != req_version:
+                    print(f"⚠ 警告: {package} 版本不一致 - 当前: {current_version}, requirements.txt: {req_version}")
+                    logger.log_warning(f"{package} 版本不一致 - 当前: {current_version}, requirements.txt: {req_version}", 'version_mismatch')
+                    version_mismatch_packages.append((package, current_version, req_version))
+            else:
+                logging.info(f"已安装: {package}")
         except ImportError:
             missing_packages.append(package)
             logger.log_dependency(package, 'missing')
             logger.log_warning(f"未安装: {package}", 'dependency_missing')
     
+    # 如果有版本不一致的包，提示用户运行 main.py 更新 requirements.txt
+    if version_mismatch_packages:
+        print("\n" + "=" * 70)
+        print("【版本警告】检测到以下包的版本与 requirements.txt 不一致:")
+        print("=" * 70)
+        for package, current_version, req_version in version_mismatch_packages:
+            print(f"  - {package}: 当前版本 {current_version}, requirements.txt 版本 {req_version}")
+        print("\n请先运行 main.py 更新 requirements.txt 中的版本信息，再运行 build.py 进行打包。")
+        print("这样可以确保打包时使用的依赖版本与运行环境一致，避免兼容性问题。")
+        print("=" * 70)
+    
     return missing_packages
 
-def verify_moviepy_modules(logger):
-    """验证 moviepy 及其子模块的可用性"""
-    print("\n" + "=" * 70)
-    print("【模块验证】检查 moviepy 子模块...")
-    print("=" * 70)
-    
-    # 定义需要检查的 moviepy 子模块
-    moviepy_modules = [
-        "moviepy.editor",
-        "moviepy.video.io.ffmpeg_tools",
-        "moviepy.video.VideoClip",
-        "moviepy.video.io.VideoFileClip",
-        "moviepy.audio.io.AudioFileClip",
-        "moviepy.audio.AudioClip"
-    ]
-    
-    all_modules_available = True
-    print(f"{'模块名称':<40} {'状态':<10}")
-    print("-" * 50)
-    
-    for module_name in moviepy_modules:
-        try:
-            __import__(module_name)
-            print(f"{module_name:<40} {'✓ 可用':<10}")
-        except ImportError as e:
-            print(f"{module_name:<40} {'✗ 不可用':<10}")
-            logger.log_warning(f"无法导入模块 {module_name}: {str(e)}", 'module_import_error')
-            all_modules_available = False
-    
-    print("-" * 50)
-    if all_modules_available:
-        print("✓ 所有 moviepy 子模块检查通过")
-    else:
-        print("⚠ 某些 moviepy 子模块不可用，可能会影响打包结果")
-        
-    # 尝试创建一个简单的测试对象
+
+
+def update_requirement_version(package_name, new_version):
+    """更新 requirements.txt 文件中指定包的版本"""
     try:
-        print("\n测试创建 VideoFileClip 和 AudioFileClip 对象...")
-        from moviepy.editor import VideoFileClip, AudioFileClip
-        print("✓ VideoFileClip 和 AudioFileClip 类可以成功导入")
+        # 读取当前的 requirements.txt
+        with open('requirements.txt', 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        # 更新指定包的版本
+        updated = False
+        for i, line in enumerate(lines):
+            if line.startswith(f"{package_name}=="):
+                lines[i] = f"{package_name}=={new_version}\n"
+                updated = True
+                break
+        
+        # 如果没有找到该包，则添加到文件末尾
+        if not updated:
+            lines.append(f"{package_name}=={new_version}\n")
+        
+        # 写回文件
+        with open('requirements.txt', 'w', encoding='utf-8') as f:
+            f.writelines(lines)
+        
+        return True
     except Exception as e:
-        print(f"✗ 无法导入 VideoFileClip 或 AudioFileClip 类: {str(e)}")
-        logger.log_warning(f"无法测试 moviepy 核心类: {str(e)}", 'moviepy_test_error')
-    
-    return all_modules_available
+        logging.error(f"更新 requirements.txt 中的 {package_name} 版本失败: {str(e)}")
+        return False
 
 def update_dependencies(logger):
-    """检查并更新依赖包，使用清华源，不先卸载再安装"""
-    logging.info("检查依赖包版本并更新...")
-    
-    # 定义不更新的包列表
-    exclude_packages = ['moviepy']
-    print(f"\n注意: 以下包将不会被更新: {', '.join(exclude_packages)}")
+    """检查依赖包版本，并提示用户使用 main.py 更新 requirements.txt"""
+    logging.info("检查依赖包版本...")
     
     # 检查是否安装了 pip-review
     try:
@@ -367,21 +398,18 @@ def update_dependencies(logger):
             
         # 显示需要更新的包
         print("\n" + "=" * 70)
-        print("【依赖更新】以下包需要更新:")
+        print("【依赖检查】以下包有新版本可用:")
         print("=" * 70)
         
-        update_table_header = f"{'包名':<20} {'当前版本':<15} {'最新版本':<15} {'状态':<10}"
+        update_table_header = f"{'包名':<20} {'当前版本':<15} {'最新版本':<15}"
         print(update_table_header)
-        print("-" * 60)
+        print("-" * 50)
         
-        update_count = 0
-        success_count = 0
-        skipped_count = 0
+        outdated_package_list = []
         
-        # 对每个需要更新的包单独更新
+        # 解析需要更新的包信息
         for line in outdated_packages.splitlines():
             if " is available" in line:
-                update_count += 1
                 # 解析包名和版本
                 try:
                     parts = line.split(" is available")
@@ -401,48 +429,66 @@ def update_dependencies(logger):
                             version_part = line.split(" (current: ")[1].split(")")[0]
                             latest_version = version_part
                         
-                        # 检查是否在排除列表中
-                        if package_name.lower() in [pkg.lower() for pkg in exclude_packages]:
-                            status = "⚠ 已跳过"
-                            skipped_count += 1
-                            print(f"{package_name:<20} {current_version:<15} {latest_version:<15} {status:<10}")
-                            continue
-                        
-                        # 显示更新信息
-                        print(f"{package_name:<20} {current_version:<15} {latest_version:<15} {'更新中...':<10}", end="\r")
-                        
-                        # 使用清华源更新包
-                        update_cmd = [
-                            sys.executable, '-m', 'pip', 'install', '--upgrade',
-                            f'{package_name}',
-                            '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple'
-                        ]
-                        
-                        update_result = subprocess.run(update_cmd, capture_output=True, text=True)
-                        
-                        if update_result.returncode == 0:
-                            status = "✓ 成功"
-                            success_count += 1
-                            logger.log_file_operation('command', f'更新 {package_name}', 'success', 
-                                                  {'output': update_result.stdout})
-                        else:
-                            status = "✗ 失败"
-                            logger.log_file_operation('command', f'更新 {package_name}', 'failed', 
-                                                  {'error': update_result.stderr})
-                            logger.log_warning(f"{package_name} 更新失败: {update_result.stderr}", 'update_error')
-                        
-                        # 更新显示结果
-                        print(f"{package_name:<20} {current_version:<15} {latest_version:<15} {status:<10}")
+                        print(f"{package_name:<20} {current_version:<15} {latest_version:<15}")
+                        outdated_package_list.append((package_name, current_version, latest_version))
                 except Exception as e:
-                    logger.log_error(f"解析包信息失败: {line}", "parsing_error", str(e))
-                    print(f"解析错误: {line} - {str(e)}")
+                    print(f"解析包信息失败: {str(e)}")
+                    logger.log_warning(f"解析包信息失败: {str(e)}", 'parse_error')
         
-        # 显示更新摘要
-        print("\n" + "-" * 60)
-        print(f"更新完成: 总计 {update_count} 个包，{success_count} 个成功，{skipped_count} 个跳过，{update_count - success_count - skipped_count} 个失败")
-        print("=" * 50)
+        # 自动更新依赖包并同步到requirements.txt
+        if outdated_package_list:
+            print("\n" + "=" * 70)
+            print("【自动更新】检测到有依赖包可以更新，正在自动更新...")
+            print("=" * 70)
+            
+            # 导入依赖检查器
+            try:
+                # 添加项目根目录到sys.path
+                project_root = os.path.dirname(os.path.abspath(__file__))
+                if project_root not in sys.path:
+                    sys.path.insert(0, project_root)
+                
+                from core.dependency_checker import DependencyChecker
+                
+                # 创建依赖检查器
+                checker = DependencyChecker()
+                
+                # 自动更新所有已安装的包
+                print("正在更新所有依赖包并同步到requirements.txt...")
+                update_results = checker.update_all_packages()
+                
+                # 显示更新结果
+                print("\n" + "=" * 70)
+                print("【更新结果】依赖包更新完成")
+                print("=" * 70)
+                
+                update_table_header = f"{'包名':<20} {'旧版本':<15} {'新版本':<15} {'状态':<10}"
+                print(update_table_header)
+                print("-" * 60)
+                
+                for package_name, info in update_results.items():
+                    old_version = info.get('old_version', 'N/A')
+                    new_version = info.get('new_version', 'N/A')
+                    updated = info.get('updated', False)
+                    status = "✓ 已更新" if updated else "- 无变化"
+                    
+                    print(f"{package_name:<20} {old_version:<15} {new_version:<15} {status:<10}")
+                
+                print("\n✓ 所有依赖包已更新，requirements.txt已同步")
+                print("=" * 70)
+                
+            except Exception as e:
+                print(f"\n✗ 自动更新依赖包失败: {str(e)}")
+                logger.log_error(f"自动更新依赖包失败", "dependency_update_error", str(e))
+                print("请手动运行 main.py 更新依赖包并同步requirements.txt")
+                traceback.print_exc()
+            
+            return True
         
-        return True
+    except Exception as e:
+        logger.log_error(f"检查依赖包版本失败: {str(e)}", "dependency_check_error")
+        print(f"✗ 检查依赖包版本失败: {str(e)}")
+        return False
         
     except subprocess.CalledProcessError as e:
         logger.log_error("依赖包检查失败", "dependency_check_error", e.stderr or e.stdout)
@@ -454,235 +500,39 @@ def update_dependencies(logger):
         print(f"\n✗ 依赖更新过程出错: {str(e)}")
         return False
 
-def create_moviepy_hook(logger):
-    """创建 moviepy 钩子文件，帮助 PyInstaller 正确收集依赖"""
+def setup_moviepy_dependencies(logger):
+    """设置 moviepy 依赖"""
     print("\n" + "=" * 70)
-    print("【钩子创建】创建 moviepy 打包钩子...")
+    print("【依赖设置】设置 moviepy 依赖...")
     print("=" * 70)
     
-    hook_content = """
-# PyInstaller hook for moviepy
-from PyInstaller.utils.hooks import collect_all
-
-# 收集 moviepy 及其子模块
-datas, binaries, hiddenimports = collect_all('moviepy')
-
-# 添加关键子模块
-hiddenimports.extend([
-    'moviepy.editor',
-    'moviepy.video.io.ffmpeg_tools',
-    'moviepy.video.VideoClip',
-    'moviepy.video.io.VideoFileClip',
-    'moviepy.audio.io.AudioFileClip',
-    'moviepy.audio.AudioClip',
-    'imageio',
-    'imageio.plugins',
-    'imageio.plugins.ffmpeg',
-    'tqdm',
-    'proglog',
-    'decorator'
-])
-"""
-    
-    hook_file = "moviepy_hook.py"
-    try:
-        with open(hook_file, "w", encoding="utf-8") as f:
-            f.write(hook_content)
-        print(f"✓ 成功创建 {hook_file}")
-        logger.log_file_operation('create', hook_file, 'success')
-        return True
-    except Exception as e:
-        print(f"✗ 创建 {hook_file} 失败: {str(e)}")
-        logger.log_error(f"创建 moviepy 钩子文件失败: {str(e)}", "hook_creation_error")
-        return False
-
-def create_moviepy_editor_file(logger):
-    """创建 moviepy_editor.py 文件来解决 moviepy.editor 导入问题"""
-    print("\n" + "=" * 70)
-    print("【文件创建】准备创建 moviepy.editor 兼容文件...")
-    print("=" * 70)
-    
-    # 获取当前 moviepy 版本
+    # 验证 moviepy 是否可用
     try:
         import moviepy
         moviepy_version = getattr(moviepy, "__version__", "未知版本")
         print(f"当前安装的 moviepy 版本: {moviepy_version}")
         
-        # 检查 moviepy 包结构，以便更好地生成兼容代码
+        # 检查 moviepy 包结构
         has_editor = hasattr(moviepy, "editor")
         has_video = hasattr(moviepy, "video")
         has_audio = hasattr(moviepy, "audio")
         
         print(f"包结构检查: editor模块存在: {has_editor}, video模块存在: {has_video}, audio模块存在: {has_audio}")
         
-        # 检查视频和音频模块路径
-        video_paths = []
-        audio_paths = []
-        
-        if has_video:
-            # 检查视频处理相关模块
-            try:
-                import inspect
-                import moviepy.video
-                video_paths = [name for name, _ in inspect.getmembers(moviepy.video, inspect.ismodule)]
-                print(f"检测到的video子模块: {', '.join(video_paths)}")
-            except Exception as e:
-                print(f"检查video子模块时出错: {str(e)}")
-        
-        if has_audio:
-            # 检查音频处理相关模块
-            try:
-                import moviepy.audio
-                audio_paths = [name for name, _ in inspect.getmembers(moviepy.audio, inspect.ismodule)]
-                print(f"检测到的audio子模块: {', '.join(audio_paths)}")
-            except Exception as e:
-                print(f"检查audio子模块时出错: {str(e)}")
-                
-    except ImportError:
-        moviepy_version = "未知版本"
-        has_editor = False
-        has_video = False
-        has_audio = False
-        video_paths = []
-        audio_paths = []
-        print("无法导入 moviepy 包，请确保已安装")
-    
-    # 根据检测到的包结构生成更智能的兼容代码
-    editor_content = """
-# 此文件用于解决 PyInstaller 打包 moviepy.editor 的问题
-# 直接导入所有 moviepy.editor 中的组件
-import sys
-import os
-import importlib
-import traceback
-
-# 记录当前导入的模块
-imported_modules = {}
-
-def safe_import(module_name, fromlist=None, alias=None):
-    try:
-        if fromlist:
-            module = __import__(module_name, fromlist=fromlist)
-            for item in fromlist:
-                try:
-                    attr = getattr(module, item, None)
-                    if attr is not None:
-                        # 使用原名或别名
-                        target_name = alias.get(item, item) if alias else item
-                        imported_modules[target_name] = attr
-                        setattr(sys.modules[__name__], target_name, attr)
-                    else:
-                        print(f"警告: {module_name} 中未找到 {item}")
-                except Exception as e:
-                    print(f"导入 {module_name}.{item} 时出错: {str(e)}")
-            return module
-        else:
-            module = __import__(module_name)
-            imported_modules[module_name] = module
-            return module
-    except ImportError as e:
-        print(f"警告: 无法导入 {module_name}: {str(e)}")
-        return None
-    except Exception as e:
-        print(f"导入 {module_name} 时出现未知错误: {str(e)}")
-        return None
-
-# 尝试导入基本组件
-try:
-    print("开始为 moviepy.editor 创建兼容层...")
-    
-    # 视频处理相关类
-    safe_import('moviepy.video.io.VideoFileClip', ['VideoFileClip'])
-    safe_import('moviepy.video.VideoClip', ['VideoClip', 'ImageClip', 'ColorClip', 'TextClip'])
-    
-    # 音频处理相关类
-    safe_import('moviepy.audio.io.AudioFileClip', ['AudioFileClip']) 
-    safe_import('moviepy.audio.AudioClip', ['AudioClip', 'CompositeAudioClip'])
-    
-    # 合成相关类
-    # 尝试不同可能的导入路径
-    video_compositing_paths = [
-        'moviepy.video.compositing.CompositeVideoClip',
-        'moviepy.video.CompositeVideoClip',
-        'moviepy.compositing.CompositeVideoClip'
-    ]
-    
-    for path in video_compositing_paths:
-        if 'CompositeVideoClip' not in imported_modules:
-            safe_import(path, ['CompositeVideoClip'])
-    
-    # 连接相关类
-    concatenate_paths = [
-        'moviepy.video.compositing.concatenate',
-        'moviepy.video.concatenate',
-        'moviepy.compositing.concatenate',
-        'moviepy.concatenate'
-    ]
-    
-    for path in concatenate_paths:
-        if 'concatenate_videoclips' not in imported_modules:
-            safe_import(path, ['concatenate_videoclips'])
-    
-    # 导入ffmpeg工具
-    ffmpeg_paths = [
-        'moviepy.video.io.ffmpeg_tools',
-        'moviepy.tools.ffmpeg_tools',
-        'moviepy.ffmpeg_tools'
-    ]
-    
-    for path in ffmpeg_paths:
-        safe_import(path, ['ffmpeg_extract_subclip', 'ffmpeg_merge_video_audio'])
-            
-    # 检查导入的组件
-    print("已成功导入的组件:")
-    for name in sorted(imported_modules.keys()):
-        print(f"  - {name}")
-    
-    # 如果缺少关键组件，尝试手动创建
-    if 'VideoFileClip' not in imported_modules or 'AudioFileClip' not in imported_modules:
-        print("警告: 缺少关键组件，尝试手动创建替代实现...")
-        
-        # 这里可以添加简单的替代实现，如果需要的话
-        
-except Exception as e:
-    print(f"加载 moviepy 组件时出错: {str(e)}")
-    traceback.print_exc()
-"""
-    
-    editor_file = "moviepy_editor.py"
-    try:
-        with open(editor_file, "w", encoding="utf-8") as f:
-            f.write(editor_content)
-        print(f"✓ 成功创建 {editor_file}")
-        logger.log_file_operation('create', editor_file, 'success')
-        
-        # 尝试导入这个文件来验证
-        try:
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("moviepy_editor", editor_file)
-            moviepy_editor = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(moviepy_editor)
-            
-            # 验证导入的模块
-            imported_count = len(getattr(moviepy_editor, 'imported_modules', {}))
-            print(f"✓ 测试导入成功，成功导入了 {imported_count} 个组件")
-            
-            # 特别检查关键类
-            for key_class in ['VideoFileClip', 'AudioFileClip']:
-                if hasattr(moviepy_editor, key_class):
-                    print(f"  ✓ 关键类 {key_class} 可用")
-                else:
-                    print(f"  ✗ 关键类 {key_class} 不可用")
-            
+        if has_editor and has_video and has_audio:
+            print("✓ moviepy 依赖检查通过")
             return True
-        except Exception as e:
-            print(f"⚠ 测试导入出现一些警告 (可能不影响运行): {str(e)}")
-            logger.log_warning(f"测试导入 moviepy_editor.py 出现警告: {str(e)}", "import_warning")
-            return True  # 仍然返回True，因为文件已创建
-            
+        else:
+            print("⚠ moviepy 包结构不完整，但将继续构建过程")
+            logger.log_warning("moviepy 包结构不完整，可能影响某些功能", "dependency_warning")
+            return True
+    except ImportError:
+        print("✗ 无法导入 moviepy 包，请确保已安装")
+        logger.log_error("无法导入 moviepy 包", "dependency_error")
+        return False
     except Exception as e:
-        print(f"✗ 创建 {editor_file} 失败: {str(e)}")
-        logger.log_error(f"创建 moviepy_editor.py 文件失败: {str(e)}", "editor_creation_error")
+        print(f"✗ 检查 moviepy 依赖时出错: {str(e)}")
+        logger.log_error(f"检查 moviepy 依赖时出错: {str(e)}", "dependency_error")
         return False
 
 def test_executable(exe_path, logger):
@@ -792,6 +642,19 @@ def main():
                 
                 if result == 0:
                     print(f"{package:<20} {'✓ 成功':<10}")
+                    
+                    # 如果安装的是 yt-dlp，提示用户运行 main.py 更新 requirements.txt
+                    if package == 'yt-dlp':
+                        try:
+                            # 获取当前版本
+                            import yt_dlp.version
+                            from yt_dlp.version import __version__ as yt_dlp_version
+                            print(f"已安装 yt-dlp 版本: {yt_dlp_version}")
+                            print("⚠ 注意: 请在安装完成后运行 main.py 以同步更新 requirements.txt 中的版本信息")
+                            logger.log_warning("请运行 main.py 同步更新 requirements.txt 中的版本信息", 'version_sync_reminder')
+                        except ImportError:
+                            print("⚠ 无法导入 yt_dlp.version 模块")
+                            logger.log_warning("无法导入 yt_dlp.version 模块", 'import_error')
                 else:
                     print(f"{package:<20} {'✗ 失败':<10}")
                     logger.log_error(f"安装依赖 {package} 失败", "dependency_installation_error")
@@ -802,24 +665,27 @@ def main():
         else:
             print("✓ 所有必要依赖已安装")
             
-        # 验证 moviepy 子模块
-        verify_moviepy_modules(logger)
+        # 验证 moviepy 依赖
+        if not setup_moviepy_dependencies(logger):
+            print("警告: moviepy 依赖验证失败，但将继续构建过程")
+            logger.log_warning("moviepy 依赖验证失败", "dependency_warning")
         
-        # 创建 moviepy 钩子文件
-        create_moviepy_hook(logger)
-        
-        # 创建 moviepy_editor.py 兼容文件
-        create_moviepy_editor_file(logger)
-        
-        # 更新依赖包
+        # 检查依赖包版本
         print("\n" + "=" * 70)
-        print("【依赖更新】检查并更新依赖包...")
+        print("【依赖检查】检查依赖包版本...")
         print("=" * 70)
-        print("使用清华源进行更新，单独更新每个包（不卸载再安装）")
         
-        if not update_dependencies(logger):
-            logger.log_warning("依赖包更新过程出现问题，但将继续构建过程", "dependency_update_warning")
-            print("⚠ 依赖包更新过程出现问题，但将继续构建过程")
+        update_dependencies(logger)
+        
+        # 提示用户确认是否继续
+        print("\n" + "=" * 70)
+        print("【确认】是否继续构建过程?")
+        print("=" * 70)
+        print("如果上面显示有依赖包版本不一致，建议先运行 main.py 更新 requirements.txt 后再构建")
+        confirm = input("是否继续构建? (y/n): ").strip().lower()
+        if confirm != 'y':
+            print("构建过程已取消")
+            return
         
         # 安装PyInstaller
         print("\n" + "=" * 70)
@@ -871,8 +737,10 @@ def main():
             '--icon "assets/icon-256-256.ico" '
             '--add-data "assets;assets" '
             '--add-data "config;config" '
-            '--add-data "moviepy_editor.py;." '  # 添加moviepy_editor.py作为数据文件
             '--hidden-import "PyQt6" '
+            '--hidden-import "PyQt6.QtCore" '
+            '--hidden-import "PyQt6.QtGui" '
+            '--hidden-import "PyQt6.QtWidgets" '
             '--hidden-import "yt_dlp" '
             '--hidden-import "pytubefix" '
             '--hidden-import "moviepy" '
@@ -882,6 +750,8 @@ def main():
             '--hidden-import "moviepy.video.io.VideoFileClip" '
             '--hidden-import "moviepy.audio.io.AudioFileClip" '
             '--hidden-import "moviepy.audio.AudioClip" '
+            '--hidden-import "moviepy.video.compositing.CompositeVideoClip" '
+            '--hidden-import "moviepy.video.compositing.concatenate" '
             '--hidden-import "imageio" '
             '--hidden-import "imageio.plugins" '
             '--hidden-import "imageio.plugins.ffmpeg" '
@@ -890,7 +760,6 @@ def main():
             '--hidden-import "decorator" '
             '--collect-submodules "moviepy" '  # 收集所有子模块
             '--collect-data "moviepy" '  # 收集所有数据文件
-            '--additional-hooks-dir="." '  # 使用当前目录中的钩子文件
             '--log-level DEBUG '  # 使用 DEBUG 级别获取更多信息
             '"main.py"'
         )
@@ -1014,4 +883,4 @@ def main():
         input("\n按回车键退出...")
 
 if __name__ == "__main__":
-    main() 
+    main()

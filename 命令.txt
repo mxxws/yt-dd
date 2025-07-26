@@ -1,22 +1,65 @@
+# yt-dd 项目常用命令
+
+## PowerShell 命令
+
+```powershell
+# 进入项目目录
 cd .\yt-dd\
+
+# 设置执行策略
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 
+# 激活虚拟环境
 .\venv\Scripts\Activate.ps1
 
+# 运行应用
 python main.py
+
+# 构建应用
 python build.py
 
-汇总命令
+# 汇总命令（一键启动）
 cd .\yt-dd\; Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process; .\venv\Scripts\Activate.ps1; python main.py
 
-
-
-
-
-
-
+# 绕过执行策略（如果需要）
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+## 开发环境设置
+
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
+# 更新依赖
+pip-review --interactive
+```
+
+## 构建选项
+
+```bash
+# 使用PyInstaller构建可执行文件
+python build.py
 
 
-1.02 解决moviepy依赖问题，更新所有依赖包，
+
+# 清理构建文件
+python build.py --clean
+
+
+仅查看可更新的包（不更新）
+python -m pip-review --local
+
+自动更新所有包
+# 激活虚拟环境后执行
+python -m pip-review --auto
+
+python -m pip_review --interactive
+
+
+
+上传到github
+
+
+
 
